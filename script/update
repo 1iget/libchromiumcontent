@@ -9,6 +9,7 @@ import subprocess
 import sys
 import urllib2
 import platform
+import tarfile
 
 import lib.filesystem as filesystem
 import lib.sccache as sccache
@@ -17,11 +18,11 @@ import lib.util as util
 from lib.config import MIPS64EL_GCC, MIPS64EL_GCC_URL, MIPS64EL_SYSROOT, \
                        set_mips64el_env, IS_ARM64_HOST, IS_ARMV7_HOST, \
                        SOURCE_ROOT, VENDOR_DIR, DEPOT_TOOLS_DIR, SRC_DIR, \
-                       COMPONENTS
-
+                       COMPONENTS,PLATFORM_KEY
 
 CHROMIUMCONTENT_SOURCE_DIR = os.path.join(SOURCE_ROOT, 'chromiumcontent')
 CHROMIUMCONTENT_DESTINATION_DIR = os.path.join(SRC_DIR, 'chromiumcontent')
+CHROMIUMCONTENT_SRC_URL = 'https://s3.amazonaws.com/github-janky-artifacts/libchromiumcontent'
 
 DEBIAN_MIRROR = 'http://ftp.jp.debian.org/debian/pool/main/'
 BINTOOLS_NAME = 'c/cross-binutils/binutils-aarch64-linux-gnu_2.25-5_amd64.deb'
@@ -38,6 +39,12 @@ solutions = [
 ]
 {cache_dir_line}
 '''
+SRC_FILES_TO_IGNORE = [
+  'src\\native_client\\toolchain\\win_x86\\nacl_x86_glibc\\x86_64-nacl\\lib\\32',
+  'src\\native_client\\toolchain\\win_x86\\nacl_x86_glibc\\x86_64-nacl\\lib64',
+  'src\\native_client\\toolchain\\win_x86\\nacl_x86_newlib\\x86_64-nacl\\lib\\32',
+  'src\\native_client\\toolchain\\win_x86\\nacl_x86_newlib\\x86_64-nacl\\lib64'
+]
 
 def main():
   args = parse_args()
@@ -59,8 +66,12 @@ def main():
   target_arch = args.target_arch
   nohooks = target_arch == 'arm64' and IS_ARM64_HOST or target_arch == 'arm' and IS_ARMV7_HOST
 
+
   if args.run_gclient:
-    gclient_sync(chromium_version(), args.clean, git_cache, nohooks)
+    if args.use_packaged_src:
+      get_packaged_src(args.clean, git_cache, nohooks, args.upload_packaged_src)
+    else:
+      gclient_sync(chromium_version(), args.clean, git_cache, nohooks)
     if args.source_only:
       return
 
@@ -93,6 +104,10 @@ def parse_args():
                       help='Skips update depot tools on Windows, easier to build locally')
   parser.add_argument('--source_only', action='store_true',
                       help='Only sync the Chromium source code')
+  parser.add_argument('--use_packaged_src', action='store_true',
+                      help='Get chromium source as packaged file')
+  parser.add_argument('--upload_packaged_src', action='store_true',
+                      help='Upload packaged chromium source if it does not exist')
 
   cc_wrapper_group = parser.add_mutually_exclusive_group()
   cc_wrapper_group.add_argument('--cc_wrapper',
@@ -298,6 +313,43 @@ def download(url, filename):
         if not len(chunk):
           break
         f.write(chunk)
+
+def get_packaged_src(clean, git_cache, nohooks, upload_src):
+  src_version = chromium_version()
+  tar_name = 'src.tar.xz'
+  package_url = '{0}/{1}/src/{2}/{3}'.format(CHROMIUMCONTENT_SRC_URL,
+                                         PLATFORM_KEY, src_version, tar_name)
+  try:
+    print 'Trying to download ' + package_url
+    download(package_url, tar_name)
+    src_tar = tarfile.open(tar_name, mode='r:xz')
+    src_tar.extractall(SOURCE_ROOT)
+    filesystem.rm_f(tar_name)
+  except:
+    print 'Could not download ' + package_url + ' syncing from git.'
+    filesystem.rm_f(tar_name)
+    gclient_sync(src_version, clean, git_cache, nohooks)
+    if ('LIBCHROMIUMCONTENT_S3_ACCESS_KEY' in os.environ and
+       'LIBCHROMIUMCONTENT_S3_BUCKET' in os.environ and
+       'LIBCHROMIUMCONTENT_S3_SECRET_KEY' in os.environ and
+       upload_src):
+      print 'Packaging source to ' + tar_name + '.'
+      tar_path =  os.path.join(SOURCE_ROOT, tar_name)
+      filesystem.safe_unlink(tar_path)
+      with util.scoped_cwd(SOURCE_ROOT):
+        tar_file = tarfile.open(tar_path, 'w:xz')
+        tar_file.add('src', exclude=exclude_git)
+        tar_file.close()
+      script_path = os.path.join(SOURCE_ROOT, 'script', 'upload')
+      script_arguments = ['--upload_packaged_src', '--chromium_version', src_version]
+      print 'Uploading source to ' + package_url + '.'
+      subprocess.check_call([sys.executable, script_path] + script_arguments)
+
+def exclude_git(filename):
+  if ".git" in filename:
+    return True
+  else:
+    return filename in SRC_FILES_TO_IGNORE
 
 if __name__ == '__main__':
   import sys

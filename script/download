@@ -13,15 +13,7 @@ import tarfile
 import lib.filesystem as filesystem
 import lib.git as git
 
-from lib.config import SOURCE_ROOT, TOOLS_DIR
-
-
-PLATFORM_KEY = {
-  'cygwin': 'win',
-  'darwin': 'osx',
-  'linux2': 'linux',
-  'win32': 'win',
-}[sys.platform]
+from lib.config import PLATFORM_KEY, SOURCE_ROOT, TOOLS_DIR
 
 SHARED_LIBRARY_FILENAME = 'libchromiumcontent.tar.bz2'
 STATIC_LIBRARY_FILENAME = 'libchromiumcontent-static.tar.bz2'

@@ -38,13 +38,13 @@ def main():
     return run_ci(args, skip_upload, use_sccache, os.environ['COMPONENT'])
 
   if sys.platform in ['win32', 'cygwin']:
-    return (run_ci(['-t', 'x64'], skip_upload, use_sccache) or
-            run_ci(['-t', 'ia32'], skip_upload, use_sccache))
+    return (run_ci(['-t', 'x64'], skip_upload, use_sccache, True) or
+            run_ci(['-t', 'ia32'], skip_upload, use_sccache, False))
   elif sys.platform == 'linux2':
-    return (run_ci(['-t', 'x64'], skip_upload, use_sccache) or
-            run_ci(['-t', 'ia32'], skip_upload, use_sccache) or
-            run_ci(['-t', 'arm'], skip_upload, use_sccache) or
-            run_ci(['-t', 'arm64'], skip_upload, use_sccache))
+    return (run_ci(['-t', 'x64'], skip_upload, use_sccache, True) or
+            run_ci(['-t', 'ia32'], skip_upload, use_sccache, False) or
+            run_ci(['-t', 'arm'], skip_upload, use_sccache, False) or
+            run_ci(['-t', 'arm64'], skip_upload, use_sccache, False))
   else:
     return run_ci([], skip_upload, use_sccache)
 
@@ -75,12 +75,14 @@ def os_version():
     return platform.platform()
 
 
-def run_ci(args, skip_upload, use_sccache, component=None):
+def run_ci(args, skip_upload, use_sccache, upload_src, component=None):
   build_args = []
   component_args = []
-  update_args = ['--clean'] + args
+  update_args = ['--clean', '--use_packaged_src'] + args
   if use_sccache:
     update_args += ['--use-bundled-sccache']
+  if upload_src:
+    update_args += ['--upload_packaged_src']
   if component is not None:
     component_args = ['-c', component]
     build_args += component_args + ['ffmpeg']
