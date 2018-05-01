@@ -10,6 +10,7 @@ import sys
 import urllib2
 import platform
 import tarfile
+import lzma
 
 import lib.filesystem as filesystem
 import lib.sccache as sccache
