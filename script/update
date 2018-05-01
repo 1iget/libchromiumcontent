@@ -10,7 +10,6 @@ import sys
 import urllib2
 import platform
 import tarfile
-import lzma
 
 import lib.filesystem as filesystem
 import lib.sccache as sccache
@@ -317,13 +316,13 @@ def download(url, filename):
 
 def get_packaged_src(clean, git_cache, nohooks, upload_src):
   src_version = chromium_version()
-  tar_name = 'src.tar.xz'
+  tar_name = 'src.tar.bz2'
   package_url = '{0}/{1}/src/{2}/{3}'.format(CHROMIUMCONTENT_SRC_URL,
                                          PLATFORM_KEY, src_version, tar_name)
   try:
     print 'Trying to download ' + package_url
     download(package_url, tar_name)
-    src_tar = tarfile.open(tar_name, mode='r:xz')
+    src_tar = tarfile.open(tar_name, mode='r:bz2')
     src_tar.extractall(SOURCE_ROOT)
     filesystem.rm_f(tar_name)
   except:
@@ -338,7 +337,7 @@ def get_packaged_src(clean, git_cache, nohooks, upload_src):
       tar_path =  os.path.join(SOURCE_ROOT, tar_name)
       filesystem.safe_unlink(tar_path)
       with util.scoped_cwd(SOURCE_ROOT):
-        tar_file = tarfile.open(tar_path, 'w:xz')
+        tar_file = tarfile.open(tar_path, 'w:bz2')
         tar_file.add('src', exclude=exclude_git)
         tar_file.close()
       script_path = os.path.join(SOURCE_ROOT, 'script', 'upload')

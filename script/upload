@@ -44,7 +44,7 @@ def upload(args):
     platform = PLATFORM_KEY
 
   if args.upload_packaged_src:
-    upload_files = glob.glob('src.tar.xz')
+    upload_files = glob.glob('src.tar.bz2')
     s3put(bucket, access_key, secret_key, SOURCE_ROOT,
           'libchromiumcontent/{0}/src/{1}'.format(PLATFORM_KEY, args.chromium_version),
           upload_files)
